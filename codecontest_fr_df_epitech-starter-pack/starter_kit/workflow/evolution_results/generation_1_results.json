@@ -1,8 +1,9 @@
 {
   "generation": 1,
   "generated_solvers": {
-    "1_peaceful_village": "methods.generated.ai_1peacefulvillage_gen1:solve"
+    "3_suburbia": "methods.generated.ai_3suburbia_gen1:solve",
+    "4_epitech": "methods.generated.ai_4epitech_gen1:solve"
   },
   "validation_results": {},
-  "timestamp": 1767023881.8699465
+  "timestamp": 1767025471.0668128
 }

@@ -200,6 +200,8 @@ def apply_suggestions(
         response = input("\nApply these parameter changes? (y/n): ")
         if response.lower() != 'y':
             return False
+    else:
+        print("\n🤖 AUTO-APPROVE MODE: Applying all suggestions automatically...")
 
     # Apply parameter changes
     if "parameter_changes" in suggestions:
@@ -209,6 +211,9 @@ def apply_suggestions(
                 new_value = change.get("suggested")
                 config["solver_params"][param] = new_value
                 print(f"Applied: {param} = {new_value} (was {old_value})")
+
+    if auto_apply:
+        print("Improvements applied. Continuing optimization...")
 
     return True
 

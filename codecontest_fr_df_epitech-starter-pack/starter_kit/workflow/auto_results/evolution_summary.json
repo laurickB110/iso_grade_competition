@@ -1,20 +1,30 @@
 {
   "datasets": [
-    "1_peaceful_village"
+    "3_suburbia",
+    "4_epitech"
   ],
-  "generations": 1,
+  "generations": 2,
   "best_solvers": {
-    "1_peaceful_village": {
+    "3_suburbia": {
       "solver": "optimized_solution",
       "method": "solver:optimized_solution",
-      "cost": 21000
+      "cost": 31305000
+    },
+    "4_epitech": {
+      "solver": "optimized_solution",
+      "method": "solver:optimized_solution",
+      "cost": 36095000
     }
   },
   "all_results": {
-    "1_peaceful_village": {
-      "optimized_solution": 21000,
-      "solve": 40000
+    "3_suburbia": {
+      "optimized_solution": 31305000,
+      "solve": 35930000
+    },
+    "4_epitech": {
+      "optimized_solution": 36095000,
+      "solve": 42700000
     }
   },
-  "timestamp": 1767023881.8700838
+  "timestamp": 1767025600.825513
 }

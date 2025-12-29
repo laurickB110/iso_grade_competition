@@ -53,6 +53,9 @@ class WorkflowOrchestrator:
         # Track start time
         self.start_time = time.time()
 
+        # Track best solutions (for final save)
+        self.best_solutions = {}  # {dataset_name: solution_dict}
+
         # Ensure directories exist
         self.solutions_dir.mkdir(parents=True, exist_ok=True)
 
@@ -218,6 +221,8 @@ class WorkflowOrchestrator:
         # Save best solution if improved
         if best_solution and best_cost < self.tracker.get_best_cost(dataset_name):
             self._save_solution(dataset_name, best_solution, best_cost)
+            # Also store in memory for final save
+            self.best_solutions[dataset_name] = best_solution
 
         if verbosity >= 1:
             print(f"Best: {summary.best_cost:,} | Avg: {summary.avg_cost:,.0f}")
@@ -352,6 +357,16 @@ class WorkflowOrchestrator:
                 )
                 print(msg)
                 break
+
+        # FORCE FINAL SAVE: Save best solution regardless of whether it improved
+        final_best_cost = self.tracker.get_best_cost(dataset_name)
+        best_solution_data = self.best_solutions.get(dataset_name)
+
+        if best_solution_data:
+            print(f"\n💾 Saving final best solution: {final_best_cost:,}")
+            self._save_solution(dataset_name, best_solution_data, final_best_cost)
+        else:
+            print(f"\n⚠️  Warning: No solution data found for {dataset_name} to save")
 
         # Return summary
         return {

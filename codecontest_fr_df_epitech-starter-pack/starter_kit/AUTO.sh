@@ -69,6 +69,7 @@ EVOLUTION_GENS=2
 OPT_ITERS=50
 QUICK_MODE=false
 CONTINUE_FLAG=""
+AUTO_APPROVE_FLAG=""
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -85,6 +86,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --continue)
             CONTINUE_FLAG="--continue"
+            shift
+            ;;
+        --auto-approve)
+            AUTO_APPROVE_FLAG="--auto-approve"
             shift
             ;;
         --datasets)
@@ -125,6 +130,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --generations <N>        Evolution generations (default: 2)"
             echo "  --iterations <N>         Optimization iterations (default: 50)"
             echo "  --continue               Continue from existing generations without prompt"
+            echo "  --auto-approve           Auto-approve all AI suggestions (100% unattended)"
             echo "  --help                   Show this help"
             echo ""
             echo "Examples:"
@@ -134,6 +140,7 @@ while [[ $# -gt 0 ]]; do
             echo "  ./AUTO.sh --datasets 3 4 5               # Datasets 3, 4, 5"
             echo "  ./AUTO.sh --datasets 3 --generations 3   # Custom"
             echo "  ./AUTO.sh --datasets 3 4 --continue      # Continue evolution"
+            echo "  ./AUTO.sh --all --auto-approve           # Fully unattended (overnight)"
             echo ""
             exit 0
             ;;
@@ -186,7 +193,8 @@ venv/bin/python3 workflow/auto_pipeline.py \
     $DATASETS \
     --evolution-generations $EVOLUTION_GENS \
     --optimization-iterations $OPT_ITERS \
-    $CONTINUE_FLAG
+    $CONTINUE_FLAG \
+    $AUTO_APPROVE_FLAG
 
 # Check exit code
 if [ $? -eq 0 ]; then

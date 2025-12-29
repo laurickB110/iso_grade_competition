@@ -1,20 +1,33 @@
 {
   "results": {
-    "1_peaceful_village": {
-      "optimized_solution": 21000,
-      "solve": 40000
+    "3_suburbia": {
+      "optimized_solution": 31305000,
+      "solve": 35930000
+    },
+    "4_epitech": {
+      "optimized_solution": 36095000,
+      "solve": 42700000
     }
   },
   "characteristics": {
-    "1_peaceful_village": {
-      "num_buildings": 5,
-      "avg_demand": 190.0,
-      "max_demand": 420,
-      "min_demand": 60,
-      "spatial_spread": 20000.0,
-      "clustering": "high",
-      "distribution": "sparse"
+    "3_suburbia": {
+      "num_buildings": 2601,
+      "avg_demand": 1233.0,
+      "max_demand": 5000,
+      "min_demand": 52,
+      "spatial_spread": 9451034.986543637,
+      "clustering": "low",
+      "distribution": "moderate"
+    },
+    "4_epitech": {
+      "num_buildings": 5000,
+      "avg_demand": 1006.316,
+      "max_demand": 4782,
+      "min_demand": 38,
+      "spatial_spread": 67141341.01723196,
+      "clustering": "low",
+      "distribution": "dense"
     }
   },
-  "timestamp": 1767023807.2943766
+  "timestamp": 1767025329.0926454
 }

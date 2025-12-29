@@ -1,28 +1,44 @@
 {
   "pipeline": "AUTO_PIPELINE",
-  "timestamp": 1767023881.9690394,
+  "timestamp": 1767037843.4397914,
   "datasets_processed": [
-    "1_peaceful_village"
+    "3_suburbia",
+    "4_epitech"
   ],
   "evolution_results": {
-    "1_peaceful_village": {
-      "optimized_solution": 21000,
-      "solve": 40000
+    "3_suburbia": {
+      "optimized_solution": 31305000,
+      "solve": 35930000
+    },
+    "4_epitech": {
+      "optimized_solution": 36095000,
+      "solve": 42700000
     }
   },
   "best_solvers": {
-    "1_peaceful_village": {
+    "3_suburbia": {
       "solver": "optimized_solution",
       "method": "solver:optimized_solution",
-      "cost": 21000
+      "cost": 31305000
+    },
+    "4_epitech": {
+      "solver": "optimized_solution",
+      "method": "solver:optimized_solution",
+      "cost": 36095000
     }
   },
   "optimization_results": {
-    "1_peaceful_village": {
-      "dataset": "1_peaceful_village",
-      "best_cost": 21000,
-      "iterations": 1,
-      "elapsed": 0.09621739387512207
+    "3_suburbia": {
+      "dataset": "3_suburbia",
+      "best_cost": 30765000,
+      "iterations": 5,
+      "elapsed": 3065.2745428085327
+    },
+    "4_epitech": {
+      "dataset": "4_epitech",
+      "best_cost": 35850000,
+      "iterations": 8,
+      "elapsed": 9177.328466415405
     }
   },
   "config": {

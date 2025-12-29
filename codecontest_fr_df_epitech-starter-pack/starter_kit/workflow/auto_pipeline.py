@@ -43,9 +43,10 @@ class AutoPipeline:
     - Optimizes automatically
     """
 
-    def __init__(self, api_key: str, continue_from_existing: bool = False):
+    def __init__(self, api_key: str, continue_from_existing: bool = False, auto_approve: bool = False):
         self.api_key = api_key
         self.continue_from_existing = continue_from_existing
+        self.auto_approve = auto_approve
         self.root_dir = Path(__file__).parent.parent
         self.config_path = self.root_dir / "workflow" / "config.yaml"
         self.results_dir = self.root_dir / "workflow" / "auto_results"
@@ -316,6 +317,10 @@ class AutoPipeline:
         config["solver_method"] = solver_method
         config["max_iterations"] = max_iterations
 
+        # Enable auto-approval if requested
+        if self.auto_approve:
+            config["auto_apply_suggestions"] = True
+
         # Save temporary config
         temp_config_path = self.results_dir / f"config_{dataset_name}.yaml"
         with open(temp_config_path, 'w') as f:
@@ -434,11 +439,15 @@ class AutoPipeline:
         print(f"Datasets: {', '.join(datasets)}")
         print(f"Evolution generations: {evolution_generations}")
         print(f"Optimization iterations: {optimization_iterations}")
+        if self.auto_approve:
+            print(f"Mode: 🤖 100% UNATTENDED (auto-approve enabled)")
         print()
         print("This will:")
         print("  1. Generate specialized solvers for each dataset (AI Evolution)")
         print("  2. Automatically select the best solver per dataset")
         print("  3. Optimize using best solvers + AI Reflection")
+        if self.auto_approve:
+            print("     → All AI suggestions will be auto-approved")
         print("  4. Generate comprehensive report")
         print()
         print("Estimated time: 1-3 hours depending on datasets")
@@ -514,6 +523,12 @@ def main():
         action="store_true",
         help="Continue from existing generations without prompting"
     )
+    parser.add_argument(
+        "--auto-approve",
+        dest="auto_approve",
+        action="store_true",
+        help="Automatically approve all AI suggestions without prompting (100%% unattended mode)"
+    )
 
     args = parser.parse_args()
 
@@ -540,7 +555,11 @@ def main():
         datasets = args.datasets
 
     # Run pipeline
-    pipeline = AutoPipeline(api_key, continue_from_existing=args.continue_from_existing)
+    pipeline = AutoPipeline(
+        api_key,
+        continue_from_existing=args.continue_from_existing,
+        auto_approve=args.auto_approve
+    )
     pipeline.run(
         datasets=datasets,
         evolution_generations=args.evolution_generations,

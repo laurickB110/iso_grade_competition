@@ -73,7 +73,7 @@ auto_apply_suggestions: false
 EOF
 
 echo "Running optimization (3 iterations)..."
-venv/bin/python3 workflow/go.py workflow/test_config.yaml
+venv/bin/python3 workflow/go.py --config workflow/test_config.yaml
 
 # Check results
 echo ""

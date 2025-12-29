@@ -182,6 +182,9 @@ class WorkflowOrchestrator:
         best_solution = None
         best_cost = float('inf')
 
+        # Get current best BEFORE running iterations
+        current_best = self.tracker.get_best_cost(dataset_name)
+
         for seed in range(seeds_count):
             result = self._run_solver_iteration(dataset_name, dataset, iteration, seed)
             self.tracker.record_run(result)
@@ -218,10 +221,13 @@ class WorkflowOrchestrator:
             timestamp=time.time()
         )
 
-        # Save best solution if improved
-        if best_solution and best_cost < self.tracker.get_best_cost(dataset_name):
+        # Save best solution if improved (compare with cost BEFORE this iteration)
+        if best_solution and best_cost < current_best:
             self._save_solution(dataset_name, best_solution, best_cost)
             # Also store in memory for final save
+            self.best_solutions[dataset_name] = best_solution
+        elif best_solution:
+            # Even if not improved, store for final save
             self.best_solutions[dataset_name] = best_solution
 
         if verbosity >= 1:

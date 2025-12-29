@@ -1,0 +1,13 @@
+# Core dependencies for competitive optimization workflow
+# Python 3.8+ required
+
+# No external dependencies required for baseline solvers
+# The baseline implementation uses only Python standard library
+
+# Optional: numpy for advanced numerical methods
+# Uncomment if you implement numpy-based solvers
+# numpy>=1.20.0
+
+# Optional: OR-Tools for constraint programming / optimization
+# Uncomment if you implement OR-Tools-based solvers
+# ortools>=9.0

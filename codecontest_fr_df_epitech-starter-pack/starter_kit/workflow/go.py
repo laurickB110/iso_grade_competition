@@ -17,14 +17,20 @@ import json
 import time
 import yaml
 import argparse
+import os
 from pathlib import Path
 from typing import Dict, List, Optional
+
+# Load .env file if it exists
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).parent.parent / ".env")
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from workflow.tracker import RunTracker, RunResult, IterationSummary
 from workflow.analyzer import WorkflowAnalyzer, Decision, create_analyzer
+from workflow.reflection_template import reflect_with_claude, apply_suggestions
 
 from starter_kit import optimized_solution
 from score_function import getSolutionScore
@@ -245,18 +251,28 @@ class WorkflowOrchestrator:
             print("Continuing with current strategy...")
             return False
 
-        print("\n[AI Reflection would be triggered here]")
-        print("This would analyze:")
-        print("  - Solver parameters effectiveness")
-        print("  - Strategy bottlenecks")
-        print("  - Potential improvements")
-        print("\nNote: Implement AI reflection by calling Claude API with context")
-        print("      See workflow/reflection_template.py for implementation guide")
+        # Call Claude API for reflection
+        print("\n🤖 Calling Claude API for strategic analysis...")
+        suggestions = reflect_with_claude(
+            dataset_name=dataset_name,
+            state=state,
+            analysis=analysis,
+            config=self.config
+        )
 
         self.tracker.increment_reflection(dataset_name)
 
-        # For now, just continue
-        return False
+        # Apply suggestions if received
+        if suggestions:
+            improved = apply_suggestions(
+                suggestions,
+                self.config,
+                auto_apply=self.config.get("auto_apply_suggestions", False)
+            )
+            return improved
+        else:
+            print("\nNo suggestions received. Continuing with current strategy...")
+            return False
 
     def _process_dataset(self, dataset_name: str) -> Dict:
         """Process a single dataset through the workflow"""

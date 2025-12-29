@@ -4,6 +4,14 @@
 # No external dependencies required for baseline solvers
 # The baseline implementation uses only Python standard library
 
+# Required for automated workflow (GO)
+pyyaml>=6.0
+python-dotenv>=1.0.0
+
+# Optional: AI reflection (for workflow/go.py)
+# Uncomment if you want AI-powered optimization suggestions
+anthropic>=0.75.0
+
 # Optional: numpy for advanced numerical methods
 # Uncomment if you implement numpy-based solvers
 # numpy>=1.20.0

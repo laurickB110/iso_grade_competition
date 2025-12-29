@@ -9,9 +9,13 @@
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
 # Colors for output
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 echo -e "${BLUE}"
@@ -19,6 +23,26 @@ echo "======================================================================"
 echo "   AUTOMATED OPTIMIZATION WORKFLOW - GO"
 echo "======================================================================"
 echo -e "${NC}"
+
+# Check if virtual environment exists
+if [ ! -d "venv" ]; then
+    echo -e "${YELLOW}⚠️  Virtual environment not found. Creating one...${NC}"
+    python3 -m venv venv
+    echo -e "${GREEN}✅ Virtual environment created${NC}"
+    echo ""
+
+    echo "Installing dependencies..."
+    venv/bin/pip install -q --upgrade pip
+    venv/bin/pip install -q -r requirements.txt
+    echo -e "${GREEN}✅ Dependencies installed${NC}"
+    echo ""
+fi
+
+# Check if .env exists (only for AI reflection)
+if [ ! -f ".env" ] && [ -f ".env.example" ]; then
+    echo -e "${YELLOW}ℹ️  .env file not found (optional, only needed for AI reflection)${NC}"
+    echo ""
+fi
 
 # Check if test mode
 if [[ "$1" == "--test" ]]; then
@@ -39,8 +63,8 @@ fi
 echo "Configuration: $CONFIG"
 echo ""
 
-# Run the workflow
-python3 workflow/go.py --config "$CONFIG"
+# Run the workflow using virtual environment
+venv/bin/python3 workflow/go.py --config "$CONFIG"
 
 # Check exit code
 if [ $? -eq 0 ]; then

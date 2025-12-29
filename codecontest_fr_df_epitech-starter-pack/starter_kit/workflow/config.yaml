@@ -1,0 +1,136 @@
+# =============================================================================
+# WORKFLOW AUTOMATION CONFIGURATION
+# =============================================================================
+# This file defines the targets and behavior for the automated GO workflow.
+# Modify this file to set your objectives and fine-tune the automation.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# TARGET SCORES (REQUIRED CONFIGURATION)
+# -----------------------------------------------------------------------------
+# Define the target score (cost) for each dataset. The workflow will stop
+# automatically when these targets are reached or exceeded.
+#
+# Format: dataset_name: target_cost
+#
+# How to set targets:
+# - Start with realistic estimates based on initial runs
+# - Adjust based on competition leaderboard if available
+# - Set aspirational goals to push the solver to its limits
+# - Use null or omit dataset to disable target checking for it
+# -----------------------------------------------------------------------------
+
+target_scores:
+  1_peaceful_village: 21000      # Small dataset - aim for optimal
+  2_small_town: 45000           # Small dataset - good coverage
+  3_suburbia: 26855000            # Medium dataset - competitive score
+  4_epitech: 30315000           # Medium-large dataset
+  5_isogrid: 164985000            # Large dataset
+  6_manhattan: 24480000          # Largest dataset - hardest to optimize
+
+# -----------------------------------------------------------------------------
+# WORKFLOW PARAMETERS
+# -----------------------------------------------------------------------------
+
+# Which datasets to process (list of dataset names without .json extension)
+# Leave empty [] to process all datasets
+active_datasets:
+#  - 1_peaceful_village
+#  - 2_small_town
+  - 3_suburbia
+  - 4_epitech
+  - 5_isogrid
+  - 6_manhattan
+
+# Maximum number of iterations per dataset before stopping
+# The workflow will stop early if targets are met
+max_iterations: 300
+
+# Number of parallel runs per iteration (different random seeds)
+# Higher values explore more variations but take more time
+seeds_per_iteration: 5
+
+# -----------------------------------------------------------------------------
+# DECISION THRESHOLDS
+# -----------------------------------------------------------------------------
+
+# How many iterations to look back when analyzing progress
+analysis_window: 5
+
+# Minimum improvement percentage to consider progress satisfactory
+# If best score improves by less than this % over the analysis window,
+# the workflow may trigger reflection phase
+min_improvement_threshold: 0.5
+
+# Number of consecutive stagnant iterations before triggering reflection
+stagnation_limit: 10
+
+# Maximum number of reflection/improvement cycles per dataset
+max_reflection_cycles: 3
+
+# -----------------------------------------------------------------------------
+# TIME LIMITS
+# -----------------------------------------------------------------------------
+
+# Maximum total runtime in seconds (0 = no limit)
+max_runtime_seconds: 0
+
+# Maximum runtime per dataset in seconds (0 = no limit)
+max_runtime_per_dataset: 0
+
+# -----------------------------------------------------------------------------
+# SOLVER CONFIGURATION
+# -----------------------------------------------------------------------------
+
+# Which solver method to use
+# Options:
+#   - "solver:optimized_solution" (default, best performance)
+#   - "methods.baseline_place_on_buildings:solve"
+#   - "methods.randomized_greedy:solve"
+solver_method: "solver:optimized_solution"
+
+# Solver-specific parameters (passed to the solver)
+solver_params:
+  # For main solver.py
+  iterations: 1000             # Local optimization iterations
+
+  # For randomized_greedy
+  # ordering: "peak"           # Options: "peak", "max", "random"
+  # radius_factor: 1.0
+  # attempt_rebalance: true
+
+# -----------------------------------------------------------------------------
+# OUTPUT CONFIGURATION
+# -----------------------------------------------------------------------------
+
+# Save detailed logs of each run
+save_run_logs: true
+
+# Save all intermediate solutions or only improvements
+save_all_solutions: false
+
+# Generate summary reports after each iteration
+generate_reports: true
+
+# Verbosity level (0=quiet, 1=normal, 2=verbose)
+verbosity: 1
+
+# -----------------------------------------------------------------------------
+# AI REFLECTION CONFIGURATION (OPTIONAL)
+# -----------------------------------------------------------------------------
+
+# Enable automatic AI-powered reflection when progress stagnates
+# Requires ANTHROPIC_API_KEY environment variable
+enable_ai_reflection: true
+
+# Model to use for reflection
+ai_model: "claude-sonnet-4-5-20250929"
+
+# What the AI should analyze during reflection
+reflection_focus:
+  - "parameter_tuning"         # Suggest better solver parameters
+  - "strategy_analysis"         # Analyze solver strategy effectiveness
+  - "bottleneck_detection"      # Identify performance bottlenecks
+
+# Whether to auto-apply AI suggestions or ask for confirmation
+auto_apply_suggestions: false

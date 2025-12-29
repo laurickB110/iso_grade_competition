@@ -1,0 +1,31 @@
+# Test configuration for quick validation
+target_scores:
+  1_peaceful_village: 25000
+
+active_datasets:
+  - 1_peaceful_village
+
+max_iterations: 3
+seeds_per_iteration: 2
+
+analysis_window: 2
+min_improvement_threshold: 0.5
+stagnation_limit: 5
+max_reflection_cycles: 1
+
+max_runtime_seconds: 0
+max_runtime_per_dataset: 0
+
+solver_method: "solver:optimized_solution"
+
+solver_params:
+  iterations: 100
+
+save_run_logs: true
+save_all_solutions: false
+generate_reports: true
+verbosity: 1
+
+enable_ai_reflection: false
+ai_model: "claude-sonnet-4-5-20250929"
+auto_apply_suggestions: false

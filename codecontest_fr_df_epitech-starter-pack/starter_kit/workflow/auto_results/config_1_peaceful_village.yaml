@@ -1,0 +1,31 @@
+active_datasets:
+- 1_peaceful_village
+ai_model: claude-sonnet-4-5-20250929
+analysis_window: 5
+auto_apply_suggestions: false
+enable_ai_reflection: true
+generate_reports: true
+max_iterations: 20
+max_reflection_cycles: 3
+max_runtime_per_dataset: 0
+max_runtime_seconds: 0
+min_improvement_threshold: 0.5
+reflection_focus:
+- parameter_tuning
+- strategy_analysis
+- bottleneck_detection
+save_all_solutions: false
+save_run_logs: true
+seeds_per_iteration: 5
+solver_method: solver:optimized_solution
+solver_params:
+  iterations: 1000
+stagnation_limit: 10
+target_scores:
+  1_peaceful_village: 21000
+  2_small_town: 45000
+  3_suburbia: 26855000
+  4_epitech: 30315000
+  5_isogrid: 164985000
+  6_manhattan: 24480000
+verbosity: 1

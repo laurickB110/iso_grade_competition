@@ -41,6 +41,9 @@ This is a competitive optimization framework for a 5G antenna placement contest.
 
 ```
 starter_kit/
+├── README.md           # Project overview and quick start
+├── AUTO.sh             # ⭐ Complete automated pipeline (recommended)
+├── GO.sh               # Optimization with AI Reflection
 ├── datasets/           # 6 city datasets (1-6)
 │   ├── 1_peaceful_village.json
 │   ├── 2_small_town.json
@@ -48,13 +51,56 @@ starter_kit/
 │   ├── 4_epitech.json       (large: ~870KB)
 │   ├── 5_isogrid.json       (very large: ~1.4MB)
 │   └── 6_manhattan.json     (very large: ~1.7MB)
-├── solutions/          # Generated solutions
+├── methods/            # Solver implementations
+│   ├── baseline_place_on_buildings.py
+│   ├── randomized_greedy.py
+│   └── generated/      # AI-generated solvers
+├── workflow/           # AI automation workflows
+│   ├── auto_pipeline.py     # Complete automation orchestrator
+│   ├── evolution.py         # AI solver generation
+│   ├── go.py                # Optimization workflow
+│   └── ai_solver_generator.py  # AI code generator
+├── solutions/
+│   └── best/           # Best solutions per dataset
+├── docs/               # 📚 Organized documentation
+│   ├── README.md       # Documentation index
+│   ├── guides/         # How-to guides
+│   ├── ai-systems/     # AI automation docs
+│   └── reference/      # Technical reference
 ├── score_function.py   # Official scoring logic (do not modify)
 ├── starter_kit.py      # Naive baseline example
 └── question.md         # Problem statement (French)
 ```
 
 ## Core Commands
+
+### Run Complete Automated Pipeline (Recommended) ⭐
+```bash
+cd starter_kit
+./AUTO.sh              # Full automation: generation + optimization
+./AUTO.sh --quick      # Quick test (15 min)
+./AUTO.sh --all        # All 6 datasets
+```
+
+This does everything automatically:
+1. AI generates specialized solvers
+2. Selects best solver per dataset
+3. Optimizes with AI Reflection
+4. Generates comprehensive report
+
+### Run Optimization with Existing Solver
+```bash
+cd starter_kit
+./GO.sh
+```
+Uses solver from `workflow/config.yaml` with AI Reflection for parameter tuning.
+
+### Generate AI Solvers Only
+```bash
+cd starter_kit
+venv/bin/python3 workflow/evolution.py --datasets 3_suburbia --generations 2
+```
+AI generates specialized solvers without running optimization.
 
 ### Score a Solution
 ```bash
@@ -64,7 +110,7 @@ import json
 from score_function import getSolutionScore
 
 dataset = json.load(open('datasets/1_peaceful_village.json'))
-solution = json.load(open('solutions/solution_1_peaceful_village_150000.json'))
+solution = json.load(open('solutions/best/1_peaceful_village.json'))
 cost, valid, msg = getSolutionScore(json.dumps(solution), json.dumps(dataset))
 print(f'Valid: {valid}, Cost: {cost}, Message: {msg}')
 "
@@ -108,9 +154,41 @@ Each dataset JSON contains:
 }
 ```
 
+## AI Automation Features
+
+This project includes AI-powered automation using Claude AI (Anthropic):
+
+### AI Solver Evolution
+- **AI generates Python code** for optimization algorithms
+- Specialized solver per dataset based on characteristics
+- Located in: `workflow/evolution.py` and `workflow/ai_solver_generator.py`
+- Generated solvers saved to: `methods/generated/`
+
+### AI Reflection
+- Real-time performance analysis during optimization
+- Automatic parameter tuning when progress stagnates
+- Located in: `workflow/go.py` and `workflow/reflection_template.py`
+- Uses Claude API to suggest improvements
+
+### AUTO Pipeline
+- Complete automation combining evolution + optimization
+- Located in: `workflow/auto_pipeline.py` and `AUTO.sh`
+- Automatic best solver selection per dataset
+- End-to-end solution generation
+
+**Configuration**: API key in `.env`, settings in `workflow/config.yaml`
+
+**Documentation**: See `docs/` directory for detailed guides
+
 ## Development Workflow
 
-When implementing new solvers or optimization algorithms:
+### Using AI Automation (Recommended)
+1. **Run AUTO.sh**: Let AI generate and optimize everything
+2. **Examine generated code**: `cat methods/generated/ai_*.py`
+3. **Review results**: `cat workflow/auto_results/final_report.json`
+
+### Manual Solver Development
+When implementing new solvers manually:
 
 1. **Precompute building demands**: For each building, calculate `max_demand = max(peak, off_peak, night)` upfront
 2. **Use deterministic randomness**: Seed with `random.Random(seed)` or `np.random.default_rng(seed)` for reproducibility

@@ -1,0 +1,66 @@
+{
+  "pipeline": "AUTO_PIPELINE",
+  "timestamp": 1767023881.9690394,
+  "datasets_processed": [
+    "1_peaceful_village"
+  ],
+  "evolution_results": {
+    "1_peaceful_village": {
+      "optimized_solution": 21000,
+      "solve": 40000
+    }
+  },
+  "best_solvers": {
+    "1_peaceful_village": {
+      "solver": "optimized_solution",
+      "method": "solver:optimized_solution",
+      "cost": 21000
+    }
+  },
+  "optimization_results": {
+    "1_peaceful_village": {
+      "dataset": "1_peaceful_village",
+      "best_cost": 21000,
+      "iterations": 1,
+      "elapsed": 0.09621739387512207
+    }
+  },
+  "config": {
+    "target_scores": {
+      "1_peaceful_village": 21000,
+      "2_small_town": 45000,
+      "3_suburbia": 26855000,
+      "4_epitech": 30315000,
+      "5_isogrid": 164985000,
+      "6_manhattan": 24480000
+    },
+    "active_datasets": [
+      "3_suburbia",
+      "4_epitech"
+    ],
+    "max_iterations": 50,
+    "seeds_per_iteration": 5,
+    "analysis_window": 5,
+    "min_improvement_threshold": 0.5,
+    "stagnation_limit": 10,
+    "max_reflection_cycles": 3,
+    "max_runtime_seconds": 0,
+    "max_runtime_per_dataset": 0,
+    "solver_method": "solver:optimized_solution",
+    "solver_params": {
+      "iterations": 1000
+    },
+    "save_run_logs": true,
+    "save_all_solutions": false,
+    "generate_reports": true,
+    "verbosity": 1,
+    "enable_ai_reflection": true,
+    "ai_model": "claude-sonnet-4-5-20250929",
+    "reflection_focus": [
+      "parameter_tuning",
+      "strategy_analysis",
+      "bottleneck_detection"
+    ],
+    "auto_apply_suggestions": false
+  }
+}

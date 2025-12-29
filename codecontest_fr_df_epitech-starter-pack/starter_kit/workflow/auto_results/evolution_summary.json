@@ -1,0 +1,20 @@
+{
+  "datasets": [
+    "1_peaceful_village"
+  ],
+  "generations": 1,
+  "best_solvers": {
+    "1_peaceful_village": {
+      "solver": "optimized_solution",
+      "method": "solver:optimized_solution",
+      "cost": 21000
+    }
+  },
+  "all_results": {
+    "1_peaceful_village": {
+      "optimized_solution": 21000,
+      "solve": 40000
+    }
+  },
+  "timestamp": 1767023881.8700838
+}

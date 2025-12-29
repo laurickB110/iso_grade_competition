@@ -1,0 +1,20 @@
+{
+  "results": {
+    "1_peaceful_village": {
+      "optimized_solution": 21000,
+      "solve": 40000
+    }
+  },
+  "characteristics": {
+    "1_peaceful_village": {
+      "num_buildings": 5,
+      "avg_demand": 190.0,
+      "max_demand": 420,
+      "min_demand": 60,
+      "spatial_spread": 20000.0,
+      "clustering": "high",
+      "distribution": "sparse"
+    }
+  },
+  "timestamp": 1767023807.2943766
+}

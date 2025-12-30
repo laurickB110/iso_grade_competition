@@ -1,44 +1,28 @@
 {
   "pipeline": "AUTO_PIPELINE",
-  "timestamp": 1767037843.4397914,
+  "timestamp": 1767101149.3570302,
   "datasets_processed": [
-    "3_suburbia",
-    "4_epitech"
+    "6_manhattan"
   ],
   "evolution_results": {
-    "3_suburbia": {
-      "optimized_solution": 31305000,
-      "solve": 35930000
-    },
-    "4_epitech": {
-      "optimized_solution": 36095000,
-      "solve": 42700000
+    "6_manhattan": {
+      "optimized_solution": 30258000,
+      "solve": 31225000
     }
   },
   "best_solvers": {
-    "3_suburbia": {
+    "6_manhattan": {
       "solver": "optimized_solution",
       "method": "solver:optimized_solution",
-      "cost": 31305000
-    },
-    "4_epitech": {
-      "solver": "optimized_solution",
-      "method": "solver:optimized_solution",
-      "cost": 36095000
+      "cost": 30258000
     }
   },
   "optimization_results": {
-    "3_suburbia": {
-      "dataset": "3_suburbia",
-      "best_cost": 30765000,
-      "iterations": 5,
-      "elapsed": 3065.2745428085327
-    },
-    "4_epitech": {
-      "dataset": "4_epitech",
-      "best_cost": 35850000,
-      "iterations": 8,
-      "elapsed": 9177.328466415405
+    "6_manhattan": {
+      "dataset": "6_manhattan",
+      "best_cost": 28456000,
+      "iterations": 11,
+      "elapsed": 10807.770336151123
     }
   },
   "config": {
@@ -52,9 +36,11 @@
     },
     "active_datasets": [
       "3_suburbia",
-      "4_epitech"
+      "4_epitech",
+      "5_isogrid",
+      "6_manhattan"
     ],
-    "max_iterations": 50,
+    "max_iterations": 300,
     "seeds_per_iteration": 5,
     "analysis_window": 5,
     "min_improvement_threshold": 0.5,

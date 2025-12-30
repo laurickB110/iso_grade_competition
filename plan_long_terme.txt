@@ -1,0 +1,726 @@
+PLAN D'AMELIORATION IA - LONG TERME (1-2 MOIS)
+==============================================
+
+PREREQUIS
+- Plan court terme complete avec succes
+- Infrastructure (evaluateur, orchestrateur) en place
+- Gains heuristiques plateaues (< 2% improvement sur 1 semaine)
+
+OBJECTIF
+- Atteindre 15-25% improvement vs baseline via optimisation exacte
+- Construire modele MIP/CP-SAT robuste et scalable
+- Implementer Large Neighborhood Search (LNS) avance
+- Optionnel: Integration solveurs commerciaux (Gurobi/CPLEX)
+
+BASELINE ASSUME (apres plan court terme)
+- Dataset 3_suburbia: 28,175,000 (objectif LT: 23,400,000, -17%)
+- Infrastructure validation + post-processing operationnelle
+
+
+================================================================================
+PHASE 1: PREPROCESSING & CANDIDATE GENERATION (SEMAINE 1-2)
+================================================================================
+
+Motivation:
+- Modeliser 2601 buildings × 4 antenna types = 10k+ variables → infaisable
+- Besoin reduire espace recherche intelligemment AVANT MIP
+
+1.1 Spatial clustering
+----------------------
+Fichier: workflow/preprocessing.py::generate_clusters()
+
+Algorithmes a tester:
+a) DBSCAN (density-based)
+   - eps = 150-300 (adapter par dataset)
+   - min_samples = 3-10
+
+b) K-means hierarchique
+   - K adaptatif: sqrt(n_buildings) / 10
+   - Lloyd algorithm avec multiple restarts
+
+c) Grid-based clustering
+   - Grille adaptative (cell size = 200-500)
+   - Merge cells adjacentes si densite similaire
+
+Output: 50-200 cluster centroids + metadata
+- cluster_id
+- centroid (x, y)
+- buildings list
+- total demand (sum, max)
+- spatial extent (radius)
+
+Delivrable:
+- [ ] 3 algorithmes clustering implementes
+- [ ] Benchmarking: quality vs computation time
+- [ ] Selection automatique best clustering par dataset
+
+
+1.2 Candidate site generation
+------------------------------
+Fichier: workflow/preprocessing.py::generate_candidate_sites()
+
+Strategies (combinees):
+
+a) Building positions (baseline)
+   - Tous les buildings = sites candidats
+   - Avantage: discount on_building
+
+b) Cluster centroids
+   - Centroids geometriques de chaque cluster
+   - Weighted centroids (ponderes par demand)
+
+c) Demand hotspots
+   - Grille 100×100 avec accumulation demand
+   - Top-K cells avec max demand
+
+d) Coverage optimization points
+   - Pour chaque building, trouver position optimale qui maximise
+     nombre autres buildings couverts dans range R
+   - Greedy: iterer sur buildings non couverts
+
+e) Pareto filtering
+   - Pour chaque paire sites (s1, s2):
+     Si s1 domine s2 (meilleur sur tous criteres): supprimer s2
+   - Criteres: cost, coverage potential, demand density
+
+Target: 100-500 sites candidats (vs 2601 initiaux)
+
+Delivrable:
+- [ ] 5 strategies generation implementees
+- [ ] Pareto filtering robuste
+- [ ] Visualisation sites candidats (scatter plot)
+- [ ] Validation: best heuristique reproductible avec sites candidats?
+
+
+1.3 Coverage matrix precomputation
+-----------------------------------
+Fichier: workflow/preprocessing.py::compute_coverage_matrix()
+
+Structures precalculees:
+
+a) Distance matrix (sparse)
+   - distances[site_id][building_id] = euclidean distance
+   - Stocker seulement si distance < max_range (400)
+   - Format: scipy.sparse.csr_matrix
+
+b) Coverage matrix par antenna type
+   - can_cover[antenna_type][site_id] = list(building_ids in range)
+   - Prefiltering: eliminate impossible combinations
+
+c) Capacity feasibility
+   - max_capacity_needed[site_id] = max demand of reachable buildings
+   - min_antenna_type[site_id] = smallest type satisfying max_capacity
+
+Output: preprocessed_data.pkl (serialize avec pickle)
+
+Temps precomputation: 1-5 min (one-time cost)
+
+Delivrable:
+- [ ] Precomputation pipeline complete
+- [ ] Serialization/deserialization
+- [ ] Tests: matrix valid, complete, no duplicates
+
+
+================================================================================
+PHASE 2: MIP/CP-SAT MODELING (SEMAINE 3-4)
+================================================================================
+
+2.1 Problem formulation
+-----------------------
+
+Variables:
+- y[s,t] ∈ {0,1}: antenna type t placed at site s
+- x[i,s,t] ∈ {0,1}: building i assigned to antenna (s,t)
+
+Objective:
+  Minimize: Σ_s Σ_t cost(s,t) × y[s,t]
+
+  where cost(s,t) = {
+    cost_on_building[t]   if s is building position
+    cost_off_building[t]  otherwise
+  }
+
+Constraints:
+
+C1. Coverage: Each building assigned exactly once
+  Σ_s Σ_t x[i,s,t] = 1   ∀i
+
+C2. Range: Assignment only if in range
+  x[i,s,t] ≤ in_range[i,s,t]   ∀i,s,t
+  where in_range[i,s,t] = 1 if distance(i,s) ≤ range[t]
+
+C3. Capacity (multi-period): Peak load ≤ capacity
+  Σ_i demand_peak[i] × x[i,s,t] ≤ capacity[t] × y[s,t]   ∀s,t
+  Σ_i demand_off[i] × x[i,s,t] ≤ capacity[t] × y[s,t]    ∀s,t
+  Σ_i demand_night[i] × x[i,s,t] ≤ capacity[t] × y[s,t]  ∀s,t
+
+C4. Antenna placement: Assignment implies antenna exists
+  x[i,s,t] ≤ y[s,t]   ∀i,s,t
+
+C5. Mutual exclusion: Max 1 antenna type per site
+  Σ_t y[s,t] ≤ 1   ∀s
+
+
+Linearization tricks:
+- Distance constraints: precomputed in_range matrix (no sqrt needed)
+- Max capacity: 3 constraints (peak, off, night) instead of complex max()
+- Big-M avoided: use logical implications in CP-SAT
+
+
+2.2 OR-Tools CP-SAT implementation
+----------------------------------
+Fichier: workflow/mip_solver.py::CPSATSolver
+
+```python
+from ortools.sat.python import cp_model
+
+class CPSATSolver:
+    def __init__(self, preprocessed_data):
+        self.data = preprocessed_data
+        self.model = cp_model.CpModel()
+        self._build_variables()
+        self._build_constraints()
+        self._build_objective()
+
+    def solve(self, time_limit_sec, warm_start=None):
+        solver = cp_model.CpSolver()
+        solver.parameters.max_time_in_seconds = time_limit_sec
+        solver.parameters.num_search_workers = 8
+
+        if warm_start:
+            self._set_warm_start(warm_start)
+
+        status = solver.Solve(self.model)
+        return self._extract_solution(solver, status)
+```
+
+Parametres CP-SAT importants:
+- num_search_workers: nombre cores (8-16)
+- max_time_in_seconds: budget temps
+- log_search_progress: True (monitoring)
+- linearization_level: 2 (maximum)
+- cp_model_probing_level: 2
+
+Delivrable:
+- [ ] CPSATSolver class complete
+- [ ] Tests sur small dataset (1_peaceful_village)
+- [ ] Validation: solution optimale trouvee en < 1 min
+
+
+2.3 Warm-start from heuristic
+------------------------------
+Fichier: workflow/mip_solver.py::set_warm_start()
+
+Mapping heuristic solution → MIP variables:
+
+1. Pour chaque antenna heuristique:
+   - Trouver site candidat le plus proche
+   - Hint: y[site, type] = 1
+
+2. Pour chaque building assignment:
+   - Trouver (site, type) correspondant
+   - Hint: x[building, site, type] = 1
+
+CP-SAT warm-start API:
+```python
+for var, value in warm_start_hints:
+    solver.parameters.hint_variables.append(var)
+    solver.parameters.hint_values.append(value)
+```
+
+Importance: Warm-start reduit temps resolution 5-10×
+
+Delivrable:
+- [ ] Warm-start pipeline complet
+- [ ] Tests: CP-SAT trouve solution ≤ warm-start
+- [ ] Benchmark: avec vs sans warm-start
+
+
+2.4 Incremental solving
+------------------------
+Fichier: workflow/mip_solver.py::incremental_solve()
+
+Strategie: Time slicing avec early stop
+
+```python
+def incremental_solve(total_budget_sec):
+    time_slices = [60, 120, 300, 600, remaining]
+    best_solution = warm_start
+
+    for time_slice in time_slices:
+        # Add constraint: objective < best_cost
+        model.Add(objective_var < best_solution.cost)
+
+        solution = solver.Solve(model, time_limit=time_slice)
+
+        if solution.is_optimal or solution.is_feasible:
+            best_solution = solution
+            print(f"Improved to {solution.cost}")
+        else:
+            print(f"No improvement in {time_slice}s, stopping")
+            break
+
+    return best_solution
+```
+
+Gains: Detection plateau plus rapide
+
+Delivrable:
+- [ ] Incremental solver implemente
+- [ ] Tests convergence sur medium dataset
+
+
+================================================================================
+PHASE 3: LARGE NEIGHBORHOOD SEARCH (SEMAINE 5-6)
+================================================================================
+
+3.1 LNS Framework
+-----------------
+Fichier: workflow/lns_solver.py
+
+Principe:
+1. Partir d'une solution feasible (heuristic ou MIP partial)
+2. DESTROY: Fixer 80-95% des variables
+3. REPAIR: Re-optimiser variables libres avec CP-SAT (petit MIP)
+4. Accepter si improvement, sinon reject
+5. Repeter avec neighborhoods differents
+
+Pseudo-code:
+```python
+def lns_optimize(initial_solution, neighborhoods, time_budget):
+    current = initial_solution
+    best = initial_solution
+
+    time_per_iteration = time_budget / (len(neighborhoods) × 10)
+
+    for iteration in range(max_iterations):
+        neighborhood = select_neighborhood(neighborhoods)
+
+        # Destroy: fix most variables
+        fixed_vars = neighborhood.select_variables_to_fix(current)
+
+        # Repair: solve small MIP
+        sub_model = build_submodel(current, fixed_vars)
+        new_solution = solve_cpsat(sub_model, time_per_iteration)
+
+        # Accept/reject
+        if new_solution.cost < current.cost:
+            current = new_solution
+            if new_solution.cost < best.cost:
+                best = new_solution
+                print(f"New best: {best.cost}")
+        else:
+            # Simulated annealing acceptance
+            if accept_with_probability(current, new_solution, temperature):
+                current = new_solution
+
+    return best
+```
+
+
+3.2 LNS Neighborhoods
+---------------------
+Fichier: workflow/lns_neighborhoods.py
+
+a) Geographic neighborhood
+   - Definir bounding box aleatoire (ou grille)
+   - Liberer: antennas et assignments dans bbox
+   - Fixer: tout le reste
+   - Taille: 10-20% du territoire
+
+b) Antenna-based neighborhood
+   - Selectionner K antennas (aleatoires ou heuristiques)
+   - Liberer: type, position, assignments de ces K antennas
+   - Fixer: autres antennas
+   - K = 5-15 pour medium datasets
+
+c) Building-based neighborhood
+   - Selectionner N buildings (worst coverage, highest cost)
+   - Liberer: assignments de ces N buildings + antennas candidates
+   - Fixer: autres buildings/antennas
+   - N = 50-200
+
+d) Type-only neighborhood
+   - Fixer: positions antennas et assignments
+   - Liberer: types antennas seulement
+   - Petit MIP, converge rapidement
+
+e) Cluster-based neighborhood
+   - Selectionner 1-3 clusters (precomputed)
+   - Liberer: tout dans clusters
+   - Fixer: inter-cluster
+
+f) Random neighborhood
+   - Fixer aleatoirement K% variables (K=85-95%)
+   - Baseline pour comparer autres strategies
+
+Heuristiques selection buildings/antennas:
+- Worst first: plus chers, moins utilises
+- Random: diversification
+- Roulette wheel: probabilite proportionnelle au cost
+
+Delivrable:
+- [ ] 6 neighborhoods implementes
+- [ ] Tests: chaque neighborhood trouve improvements
+- [ ] Benchmark: meilleur ordre application
+
+
+3.3 Adaptive LNS
+----------------
+Fichier: workflow/lns_solver.py::AdaptiveLNS
+
+Idee: Apprendre quelle neighborhood marche le mieux
+
+Algorithme: Multi-Armed Bandit (UCB1)
+```python
+class AdaptiveLNS:
+    def __init__(self, neighborhoods):
+        self.scores = {n: 0 for n in neighborhoods}
+        self.counts = {n: 0 for n in neighborhoods}
+
+    def select_neighborhood(self, iteration):
+        # UCB1: explore vs exploit tradeoff
+        ucb_scores = {}
+        for n in self.neighborhoods:
+            if self.counts[n] == 0:
+                return n  # Try each at least once
+
+            exploit = self.scores[n] / self.counts[n]
+            explore = sqrt(2 × log(iteration) / self.counts[n])
+            ucb_scores[n] = exploit + explore
+
+        return max(ucb_scores, key=ucb_scores.get)
+
+    def update(self, neighborhood, improvement):
+        self.counts[neighborhood] += 1
+        self.scores[neighborhood] += improvement
+```
+
+Gains: Allocation temps optimale aux meilleurs neighborhoods
+
+Delivrable:
+- [ ] AdaptiveLNS avec UCB1 implemente
+- [ ] Comparaison vs round-robin neighborhood selection
+- [ ] Logs: distribution usage neighborhoods
+
+
+3.4 Parallel LNS
+----------------
+Fichier: workflow/lns_solver.py::ParallelLNS
+
+Idee: Executer multiple neighborhoods en parallele
+
+Architecture:
+- Master process: maintient best solution, distribue work
+- Worker processes: executent LNS iterations
+- Shared memory: best solution updated atomically
+
+```python
+def parallel_lns(initial_solution, neighborhoods, n_workers, time_budget):
+    with multiprocessing.Pool(n_workers) as pool:
+        # Distribute neighborhoods to workers
+        tasks = []
+        for worker_id in range(n_workers):
+            neighborhood_subset = neighborhoods[worker_id::n_workers]
+            task = pool.apply_async(
+                lns_worker,
+                args=(initial_solution, neighborhood_subset, time_budget)
+            )
+            tasks.append(task)
+
+        # Collect results
+        results = [task.get() for task in tasks]
+        return min(results, key=lambda s: s.cost)
+```
+
+Gains: Speedup lineaire (8 workers → 8× iterations)
+
+Delivrable:
+- [ ] Parallel LNS implemente
+- [ ] Tests: speedup mesure vs sequential
+- [ ] Synchronization correcte (no race conditions)
+
+
+================================================================================
+PHASE 4: COMMERCIAL SOLVERS (OPTIONNEL - SEMAINE 7)
+================================================================================
+
+Prerequis: Licences disponibles (académiques ~$500/an ou commerciales)
+
+4.1 Gurobi integration
+----------------------
+Fichier: workflow/mip_solver.py::GurobiSolver
+
+```python
+import gurobipy as gp
+
+class GurobiSolver:
+    def __init__(self, preprocessed_data):
+        self.data = preprocessed_data
+        self.model = gp.Model("antenna_placement")
+        self._build_model()
+
+    def solve(self, time_limit_sec, warm_start=None):
+        self.model.Params.TimeLimit = time_limit_sec
+        self.model.Params.Threads = 8
+        self.model.Params.MIPFocus = 1  # Feasibility focus
+
+        if warm_start:
+            self._set_mip_start(warm_start)
+
+        self.model.optimize()
+        return self._extract_solution()
+```
+
+Parametres Gurobi importants:
+- MIPFocus: 1 (feasibility) ou 2 (optimality)
+- Cuts: aggressive tuning
+- Heuristics: 0.5 (high)
+- Presolve: 2 (aggressive)
+
+Delivrable:
+- [ ] GurobiSolver class complete
+- [ ] Benchmark vs OR-Tools sur same time budget
+- [ ] Decision: worth the license cost?
+
+
+4.2 CPLEX integration
+---------------------
+Fichier: workflow/mip_solver.py::CPLEXSolver
+
+Similar a Gurobi, API docplex (Python):
+
+```python
+from docplex.mp.model import Model
+
+class CPLEXSolver:
+    def __init__(self, preprocessed_data):
+        self.data = preprocessed_data
+        self.model = Model("antenna_placement")
+        self._build_model()
+
+    def solve(self, time_limit_sec, warm_start=None):
+        self.model.set_time_limit(time_limit_sec)
+        self.model.parameters.threads = 8
+
+        if warm_start:
+            self.model.add_mip_start(warm_start)
+
+        solution = self.model.solve()
+        return self._extract_solution(solution)
+```
+
+Delivrable:
+- [ ] CPLEXSolver class complete
+- [ ] Benchmark vs OR-Tools et Gurobi
+
+
+4.3 Solver portfolio with auto-selection
+-----------------------------------------
+Fichier: workflow/solver_manager.py
+
+```python
+class SolverPortfolio:
+    def __init__(self):
+        self.available_solvers = self._detect_solvers()
+
+    def _detect_solvers(self):
+        solvers = []
+        if self._check_ortools():
+            solvers.append(('ortools', CPSATSolver))
+        if self._check_gurobi():
+            solvers.append(('gurobi', GurobiSolver))
+        if self._check_cplex():
+            solvers.append(('cplex', CPLEXSolver))
+        return solvers
+
+    def solve_with_best(self, problem, time_budget):
+        # Try each solver with time slice
+        time_per_solver = time_budget / len(self.available_solvers)
+
+        results = []
+        for name, solver_class in self.available_solvers:
+            try:
+                solver = solver_class(problem)
+                solution = solver.solve(time_per_solver)
+                results.append((name, solution))
+            except Exception as e:
+                print(f"Solver {name} failed: {e}")
+
+        # Return best solution
+        return min(results, key=lambda x: x[1].cost)
+```
+
+Delivrable:
+- [ ] Portfolio avec fallback automatique
+- [ ] Tests: robustesse si solver unavailable
+
+
+================================================================================
+PHASE 5: ADVANCED TECHNIQUES (SEMAINE 8+)
+================================================================================
+
+5.1 Column generation (optionnel)
+----------------------------------
+Si MIP trop gros meme avec preprocessing:
+
+Idee: Generer antennas configurations on-the-fly
+- Master problem: selection configurations
+- Pricing problem: generer nouvelle configuration rentable
+
+Complexite: High, reserve pour cas extremes
+
+5.2 Benders decomposition (optionnel)
+--------------------------------------
+Decomposer en 2 problemes:
+- Master: placement antennas (y variables)
+- Sub: assignment buildings (x variables)
+
+Iterer avec Benders cuts
+
+5.3 Machine Learning pour preprocessing
+----------------------------------------
+Apprendre quels sites candidats prometteurs:
+- Features: demand density, spatial centrality, cost
+- Target: probability site in optimal solution
+- Model: Random Forest ou XGBoost
+- Training: solutions optimales small datasets
+
+Utiliser pour filtrer sites avant MIP
+
+
+================================================================================
+INTEGRATION COMPLETE
+================================================================================
+
+Script final: run_advanced_pipeline.sh
+
+```bash
+#!/bin/bash
+
+DATASET=$1
+TIME_BUDGET=${2:-7200}  # 2h default
+
+# Phase 1: Preprocessing (5%)
+python workflow/preprocessing.py --dataset $DATASET \
+    --output preprocessed_data.pkl
+
+# Phase 2: Heuristic warm-start (20%)
+./run_pipeline.sh --dataset $DATASET --mode fast \
+    --time-budget $((TIME_BUDGET * 20 / 100)) \
+    --output warm_start_solution.json
+
+# Phase 3: MIP with warm-start (30%)
+python workflow/mip_solver.py --dataset $DATASET \
+    --preprocessed preprocessed_data.pkl \
+    --warm-start warm_start_solution.json \
+    --time-budget $((TIME_BUDGET * 30 / 100)) \
+    --output mip_solution.json
+
+# Phase 4: LNS refinement (40%)
+python workflow/lns_solver.py --dataset $DATASET \
+    --initial mip_solution.json \
+    --time-budget $((TIME_BUDGET * 40 / 100)) \
+    --output lns_solution.json
+
+# Phase 5: Final post-processing (5%)
+python workflow/post_optimizer.py \
+    --solution lns_solution.json \
+    --output final_solution.json
+
+# Evaluation
+python workflow/evaluator.py --solution final_solution.json \
+    --dataset $DATASET \
+    --report results/report_${DATASET}.json
+```
+
+
+================================================================================
+METRIQUES DE SUCCES LONG TERME
+================================================================================
+
+Objectifs quantitatifs par dataset:
+
+3_suburbia (baseline CT: 28,175,000):
+- MIP basic: 26,000,000 (-8%)
+- MIP + LNS: 24,000,000 (-15%)
+- Target stretch: 23,400,000 (-17%)
+
+Time budgets:
+- Small (1-2): 30 min MIP + 30 min LNS
+- Medium (3-4): 2h MIP + 4h LNS
+- Large (5-6): 4h MIP + 12h LNS (overnight)
+
+Code quality:
+- Model validation: tests unitaires sur contraintes
+- Solver robustness: 100% runs successful (no crashes)
+- Scalability: support jusqu'a 10k buildings
+
+
+================================================================================
+RISQUES LONG TERME
+================================================================================
+
+Risque 1: MIP ne scale pas meme avec preprocessing
+→ Mitigation: Restric to heuristic + LNS only, skip MIP global
+
+Risque 2: Licensing issues (Gurobi/CPLEX)
+→ Mitigation: OR-Tools primary, commercial solvers bonus
+
+Risque 3: Implementation bugs in complex MIP model
+→ Mitigation: Incremental validation, small tests first
+
+Risque 4: LNS converge trop lentement
+→ Mitigation: Better neighborhoods, parallel LNS
+
+Risque 5: Time investment > returns
+→ Mitigation: Decision gate apres chaque phase, stop si gains < seuil
+
+
+================================================================================
+DECISION GATES
+================================================================================
+
+Gate 1 (fin semaine 2): Preprocessing quality
+- Clustering genere <500 sites candidats: GO
+- Heuristic still works avec sites candidats: GO
+- Sinon: STOP, revoir preprocessing
+
+Gate 2 (fin semaine 4): MIP basic fonctionne
+- CP-SAT trouve solution ≤ heuristic en <1h: GO
+- Improvement ≥ 5% vs heuristic: GO
+- Sinon: STOP, focus LNS only
+
+Gate 3 (fin semaine 6): LNS donne gains
+- LNS improvement ≥ 3% vs MIP basic: GO
+- Multiple neighborhoods effective: GO
+- Sinon: STOP, diminishing returns
+
+Gate 4 (fin semaine 7): Commercial solvers worth it?
+- Gurobi/CPLEX improvement ≥ 5% vs OR-Tools: GO
+- License cost justified par gains competition: GO
+- Sinon: STOP, stay with OR-Tools
+
+
+================================================================================
+CONCLUSION LONG TERME
+================================================================================
+
+Le plan long terme est ambitieux mais structuré en phases incrementales.
+Chaque phase a des decision gates pour eviter over-investment.
+
+Success path:
+1. Preprocessing reduit espace recherche 5-10×
+2. MIP donne baseline optimality gaps
+3. LNS affine solutions localement
+4. Combined gain: 15-25%
+
+Fallback path:
+Si MIP trop complexe: Heuristic + post-processing + LNS heuristique
+(sans MIP) peut quand meme donner 10-15% gains
+
+Recommendation:
+- Start avec plan court terme (2 semaines)
+- Evaluate gains avant commitment long terme
+- Seuil decision: si gains CT < 8%, investir dans LT
+                  si gains CT ≥ 12%, iterer sur CT seulement

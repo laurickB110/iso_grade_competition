@@ -1,0 +1,484 @@
+PLAN D'AMELIORATION IA - COURT TERME (1-2 SEMAINES)
+======================================================
+
+OBJECTIF PRINCIPAL
+- Ameliorer les solutions existantes de 5-10% via post-processing et tuning
+- Construire l'infrastructure pour iterations futures (evaluateur, orchestrateur)
+- Valider les gains avant d'investir dans MIP/CP-SAT complexe
+
+BASELINE ACTUEL (3_suburbia)
+- Best heuristique: 31,305,000 (gen3 sur 5 runs)
+- Objectif court terme: 29,740,000 (-5%) via local search
+- Objectif stretch: 28,175,000 (-10%) si multi-start performant
+
+PRINCIPES
+- Start simple, iterate fast
+- Every change validated by score_function.py
+- Backward compatible with existing workflow
+- Log everything for analysis
+
+
+================================================================================
+PHASE 1: INFRASTRUCTURE (JOUR 1-2)
+================================================================================
+
+1.1 Evaluateur centralise
+--------------------------
+Fichier: workflow/evaluator.py
+
+Responsabilites:
+- Wrapper unique autour de score_function.py
+- Cache des evaluations (hash solution -> score)
+- Collecte metrics: cost, nb_antennas, coverage, validity
+- Export JSON pour analyse
+
+API:
+```python
+class SolutionEvaluator:
+    def evaluate(self, solution: dict, dataset: dict) -> EvalResult
+    def compare(self, sol1: dict, sol2: dict) -> ComparisonResult
+    def get_best(self, solutions: List[dict]) -> Tuple[dict, float]
+```
+
+Delivrable:
+- [ ] workflow/evaluator.py implemente et teste
+- [ ] Integration avec AUTO.sh pour logging unifie
+
+
+1.2 Runner parallele multi-seeds
+---------------------------------
+Fichier: workflow/parallel_runner.py
+
+Amelioration AUTO.sh actuel:
+- Lancer chaque solveur (gen1-gen8) avec 10 seeds au lieu de 5
+- Parallelisation sur tous les cores disponibles
+- Timeout par solver: 5 min (small), 15 min (medium), 30 min (large)
+
+Commande:
+```bash
+./run_parallel.sh --dataset 3_suburbia --solvers gen1,gen2,gen3,gen4,gen5,gen6,gen7,gen8 \
+                  --seeds 10 --timeout 900 --parallel 8
+```
+
+Delivrable:
+- [ ] Script run_parallel.sh fonctionnel
+- [ ] Integration avec evaluateur pour selection automatique du best
+
+
+1.3 Solution validator
+----------------------
+Fichier: workflow/validator.py
+
+Check robustesse avant score:
+- Format JSON valide
+- Tous les batiments couverts exactement 1 fois
+- Contraintes distance respectees
+- Contraintes capacite respectees
+- Coordonnees valides (entiers positifs)
+
+Pourquoi: Eviter les appels score_function.py sur solutions invalides (gain temps)
+
+Delivrable:
+- [ ] validator.py implemente
+- [ ] Tests unitaires sur solutions connues (valid + invalid)
+
+
+================================================================================
+PHASE 2: POST-PROCESSING LOCAL SEARCH (JOUR 3-5)
+================================================================================
+
+2.1 Type downgrade optimizer
+-----------------------------
+Fichier: workflow/post_optimizer.py::antenna_type_downgrade()
+
+Strategie:
+Pour chaque antenne (ordre aleatoire):
+  Pour chaque type moins cher (ordre croissant):
+    Si tous les batiments assignes restent:
+      - Dans le range du nouveau type
+      - Dans la capacite du nouveau type
+    Alors: downgrade et recalcul cost
+
+Gains attendus: 2-5% (surtout sur Density -> Spot/MaxRange)
+
+Exemple:
+- Antenne Density (50k) couvre 8 batiments avec demand totale 2500
+- MaxRange (50k) a capacity 3500 et range 400: peut-etre suffisant
+- Si tous batiments < 400m: downgrade vers MaxRange (meme cost mais plus flexible)
+- Si possible Spot (20k): -30k savings!
+
+Delivrable:
+- [ ] Fonction antenna_type_downgrade() implementee
+- [ ] Tests sur solutions gen1-gen8
+- [ ] Benchmark improvement moyen
+
+
+2.2 Antenna repositioning
+--------------------------
+Fichier: workflow/post_optimizer.py::antenna_reposition()
+
+Strategie:
+Pour chaque antenne:
+  1. Calculer centroid geometrique des batiments assignes
+  2. Tester positions candidates:
+     - Centroid exact (x,y)
+     - Centroid arrondi vers chaque batiment assigne
+  3. Pour chaque position candidate:
+     - Verifier que tous batiments restent in range
+     - Calculer nouveau cost (on_building vs off_building)
+  4. Garder position avec meilleur cost
+
+Gains attendus: 1-3% (discount on_building)
+
+Delivrable:
+- [ ] Fonction antenna_reposition() implementee
+- [ ] Tests sur solutions gen1-gen8
+
+
+2.3 Building reassignment optimizer
+------------------------------------
+Fichier: workflow/post_optimizer.py::optimize_assignments()
+
+Strategie:
+Pour chaque batiment (ordre demand decroissant):
+  1. Trouver toutes les antennes candidates (in range + capacite dispo)
+  2. Calculer impact cost de chaque reassignment:
+     - Cost si retire de antenne actuelle (upgrade type si needed)
+     - Cost si ajoute a antenne candidate (upgrade type si needed)
+  3. Reassigner vers antenne minimisant cost total
+  4. Iterer jusqu'a convergence (aucun improvement)
+
+Gains attendus: 3-7% (meilleure utilisation capacites)
+
+Delivrable:
+- [ ] Fonction optimize_assignments() implementee
+- [ ] Tests convergence sur solutions gen1-gen8
+
+
+2.4 Antenna merging
+-------------------
+Fichier: workflow/post_optimizer.py::merge_antennas()
+
+Strategie:
+Pour toutes paires d'antennes proches (distance < seuil):
+  1. Tester si une seule antenne (type + position optimale) peut couvrir
+  2. Calculer cost merge vs cost 2 antennes separees
+  3. Si gain > seuil: merger
+
+Gains attendus: 1-4% (elimination redondances)
+
+Delivrable:
+- [ ] Fonction merge_antennas() implementee
+- [ ] Tests sur solutions gen1-gen8
+
+
+2.5 Pipeline post-processing complet
+-------------------------------------
+Fichier: workflow/post_optimizer.py::optimize_solution()
+
+Ordre d'application (important!):
+1. Building reassignment (iterations jusqu'a convergence)
+2. Antenna merging (1 passe)
+3. Antenna repositioning (1 passe)
+4. Type downgrade (1 passe)
+5. Building reassignment final (1 passe cleanup)
+
+Temps estime: 30s (small), 2 min (medium), 5 min (large)
+
+Delivrable:
+- [ ] Pipeline complet implemente
+- [ ] Script post_optimize.sh pour appliquer sur solutions existantes
+- [ ] Rapport improvement par dataset
+
+
+================================================================================
+PHASE 3: MULTI-START STRATEGIES (JOUR 6-7)
+================================================================================
+
+3.1 Diversified initialization
+-------------------------------
+Fichier: workflow/multi_start.py
+
+Strategies a implementer:
+a) Random priority: ordre batiments aleatoire
+b) Demand-first: ordre demand decroissant (actuel)
+c) Spatial-first: ordre spatial (left->right, top->bottom)
+d) Cluster-first: clustering puis traitement par cluster
+e) Hybrid: mix des strategies ci-dessus
+
+Pour chaque strategy:
+- Generer solution initiale
+- Appliquer post-processing complet
+- Garder best solution
+
+Gains attendus: 5-15% (diversite exploration)
+
+Delivrable:
+- [ ] Multi-start avec 5 strategies implementees
+- [ ] Integration dans run_pipeline.sh
+- [ ] Benchmark sur 3_suburbia avec budget 30 min
+
+
+3.2 Perturbation + restart
+---------------------------
+Fichier: workflow/multi_start.py::perturb_and_restart()
+
+Strategie:
+Partir du best connu:
+1. Perturber: supprimer 10-30% des antennes aleatoirement
+2. Reconstruire: greedy assignment pour batiments non couverts
+3. Post-process: pipeline complet
+4. Accepter si improvement
+
+Repeter N fois avec perturbations differentes
+
+Gains attendus: 2-5% (echapper local optima)
+
+Delivrable:
+- [ ] Fonction perturb_and_restart() implementee
+- [ ] Tests avec differents taux perturbation
+
+
+================================================================================
+PHASE 4: ORCHESTRATION (JOUR 8-10)
+================================================================================
+
+4.1 Script run_pipeline.sh
+---------------------------
+Orchestrateur principal non-interactif
+
+Usage:
+```bash
+./run_pipeline.sh --dataset 3_suburbia --time-budget 3600 --output results/
+```
+
+Pipeline complet:
+1. Load dataset + validator check
+2. Phase 1: Portfolio heuristiques (gen1-gen8) × 10 seeds
+   - Time budget: 40% du total
+   - Parallelise sur tous cores
+3. Phase 2: Multi-start strategies sur top-3 solvers
+   - Time budget: 30% du total
+4. Phase 3: Post-processing sur top-5 solutions
+   - Time budget: 20% du total
+5. Phase 4: Perturbation + restart sur best
+   - Time budget: 10% du total
+6. Export final: best solution + logs + metrics
+
+Delivrables:
+- [ ] run_pipeline.sh implemente
+- [ ] Tests end-to-end sur 3_suburbia
+- [ ] Documentation utilisation
+
+
+4.2 Logging et reporting
+-------------------------
+Fichier: workflow/reporter.py
+
+Pour chaque run:
+- Logs JSON structure: logs/<dataset>_<timestamp>.json
+- Metrics collectees:
+  * Cost evolution (par phase)
+  * Time per phase
+  * Number solutions explored
+  * Best solution per phase
+  * Improvement % vs baseline
+
+Rapport final: results/<dataset>_report.html
+- Graphiques evolution cost
+- Tableau comparaison methods
+- Best solution visualisee
+- Recommendations pour iteration suivante
+
+Delivrable:
+- [ ] reporter.py implemente
+- [ ] HTML report template
+- [ ] Integration dans run_pipeline.sh
+
+
+4.3 Validation results
+-----------------------
+Tests a executer avant claim victory:
+
+1. Reproductibilite:
+   - Relancer pipeline 3 fois avec memes seeds
+   - Verifier memes solutions obtenues
+
+2. Robustesse:
+   - Tester sur tous les 6 datasets
+   - Verifier aucun crash/timeout
+
+3. Regression:
+   - Comparer vs baselines existantes
+   - Verifier improvements >= objectifs
+
+Delivrable:
+- [ ] Test suite validation complete
+- [ ] CI/CD script pour validation auto
+
+
+================================================================================
+PHASE 5: INTEGRATION & DEPLOYMENT (JOUR 11-12)
+================================================================================
+
+5.1 Backward compatibility
+---------------------------
+Garder l'existant fonctionnel:
+- AUTO.sh toujours disponible (evolution solvers)
+- GO.sh toujours disponible (reflection optimization)
+- Nouveaux scripts additifs, pas remplacement
+
+Integration:
+```bash
+# Ancien workflow (toujours OK)
+./AUTO.sh --datasets 3 --generations 4
+
+# Nouveau workflow (avec post-processing)
+./run_pipeline.sh --dataset 3_suburbia --mode full
+
+# Hybride (best of both)
+./AUTO.sh --datasets 3 --generations 4 && \
+./run_pipeline.sh --dataset 3_suburbia --mode post-process-only
+```
+
+Delivrable:
+- [ ] Tests backward compatibility
+- [ ] Documentation migration
+
+
+5.2 Documentation
+-----------------
+Fichiers a creer/updater:
+
+1. README_OPTIMIZATION.md
+   - Overview nouveau pipeline
+   - Quick start guide
+   - API reference evaluator/optimizer
+   - Performance benchmarks
+
+2. ARCHITECTURE.md
+   - Diagramme components
+   - Data flow
+   - Extension points
+
+3. RESULTS.md
+   - Benchmarks avant/apres
+   - Gains par technique
+   - Best practices
+
+Delivrable:
+- [ ] Documentation complete
+- [ ] Exemples usage
+
+
+5.3 Cleanup & polish
+--------------------
+- Code review: PEP8, types, docstrings
+- Remove debug code
+- Optimize slow functions (profiling)
+- Add error handling robuste
+- Final tests all datasets
+
+Delivrable:
+- [ ] Code production-ready
+- [ ] All tests passing
+
+
+================================================================================
+METRIQUES DE SUCCES
+================================================================================
+
+Objectifs quantitatifs:
+
+Dataset 3_suburbia (baseline: 31,305,000):
+- Minimum acceptable: 29,740,000 (-5%)
+- Target: 28,175,000 (-10%)
+- Stretch: 26,609,250 (-15%)
+
+Autres datasets (estimation):
+- 1_peaceful_village: -10-20% (small, plus facile)
+- 2_small_town: -10-15%
+- 4_epitech: -5-8% (large, plus difficile)
+- 5_isogrid: -3-5% (very large, limite heuristiques)
+- 6_manhattan: -3-5%
+
+Time budget respecte:
+- Pipeline complet < 1h pour medium datasets
+- Parallelisation efficace (speedup lineaire)
+
+Code quality:
+- 100% solutions valides (no crashes)
+- Reproductible (seed control)
+- Logs complets pour debug
+
+
+================================================================================
+RISQUES & MITIGATIONS
+================================================================================
+
+Risque 1: Post-processing apporte <2% gains
+→ Mitigation: Multi-start strategies deviennent priorite
+
+Risque 2: Time overhead orchestration trop important
+→ Mitigation: Profiling, optimisation, parallelisation
+
+Risque 3: Solutions degenerent (invalid) apres post-processing
+→ Mitigation: Validator systematique, rollback si invalid
+
+Risque 4: Pas le temps de finir toutes les phases
+→ Mitigation: Priorites claires, phases independantes
+
+
+================================================================================
+PLANNING DETAILLE
+================================================================================
+
+Jour 1-2: Infrastructure
+- Evaluateur + validator + runner parallele
+- Tests unitaires
+
+Jour 3-5: Post-processing
+- 4 techniques local search
+- Pipeline integration
+- Benchmarks
+
+Jour 6-7: Multi-start
+- 5 strategies initialization
+- Perturbation + restart
+- Tests performance
+
+Jour 8-10: Orchestration
+- run_pipeline.sh complet
+- Logging + reporting
+- Validation end-to-end
+
+Jour 11-12: Polish
+- Documentation
+- Backward compatibility
+- Final tests + benchmarks
+
+Buffer: 2-3 jours pour imprevus
+
+
+================================================================================
+NEXT STEPS IMMEDIATS
+================================================================================
+
+1. Review ce plan avec equipe/stakeholders
+2. Creer issues GitHub par delivrable
+3. Setup environment (dependencies, etc.)
+4. Commencer Jour 1: evaluateur.py
+5. Daily check-ins pour tracker progress
+
+================================================================================
+TRANSITION VERS LONG TERME
+================================================================================
+
+Si gains court terme < 10%:
+→ Passer au plan long terme (MIP/CP-SAT)
+
+Si gains court terme >= 10%:
+→ Iterer sur post-processing + multi-start
+→ MIP devient optionnel (nice-to-have)
+
+Decision point: Fin semaine 2

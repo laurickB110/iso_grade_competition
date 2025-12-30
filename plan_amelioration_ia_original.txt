@@ -1,0 +1,97 @@
+PLAN D'AMELIORATION IA - FULL AUTONOMIE PILOTEE PAR METRIQUE
+
+Objectif
+- Construire un workflow 100% autonome et non interactif qui genere, evalue et ameliore des solutions via une boucle d'optimisation basee sur un score officiel (cout + contraintes).
+- Maximiser l'efficacite en partant du postulat que des agents IA peuvent proposer de meilleurs parametres/strategies qu'un humain, tout en gardant une validation objective par la metrique.
+
+Principes non negociables
+- Pilotage par metrique: aucune decision n'est validee sans improvement measurable.
+- Reproductibilite: seeds fixes par run, logs complets, artefacts sauvegardes.
+- Robustesse: fallback automatique si un solveur n'est pas disponible (licence, crash, timeout).
+
+Score officiel (deja defini)
+- Le script reference est codecontest_fr_df_epitech-starter-pack/starter_kit/score_function.py.
+- Il fait loi et ne doit pas etre modifie.
+- Tout le workflow doit appeler cette fonction pour obtenir le score officiel.
+- Output: score unique a minimiser, plus metrics secondaires (couverture, nb antennes, temps) si disponibles.
+
+Pipeline hybride (coeur du workflow)
+1) Preprocess + generation de sites candidats
+   - Sites = batiments + centroides (clusters) + hotspots (zones denses) + grille adaptative.
+   - Objectif: limiter l'espace de recherche pour rendre le MIP/CP-SAT solvable.
+
+2) Portfolio de solveurs heuristiques (parallel)
+   - Lancer plusieurs solveurs existants (gen1..gen8) avec variations de seeds/parametres.
+   - Selection: garder top-K solutions selon le score officiel.
+
+3) Polissage LNS (CP-SAT / MIP local)
+   - Warm-start: injecter la meilleure solution heuristique.
+   - Fixer 80-95% des decisions et re-optimiser une fenetre locale (LNS).
+   - Fenetre adaptee dynamiquement: taille plus grande si plateau, plus petite si progres rapides.
+
+4) MIP global reduit (optionnel si temps suffisant)
+   - MIP/CP-SAT sur un sous-ensemble de sites candidats (top-K).
+   - Time slicing: cycles courts, re-evaluation, nouvelles fenetres LNS.
+
+5) Acceptance criterion
+   - Nouvelle solution acceptee si improvement >= X% vs baseline (ex: 0.5%)
+   - Ou improvement absolu >= seuil minimal pour eviter du bruit.
+
+6) Boucle auto d'optimisation
+   - Multi-armed bandit ou Bayesian Optimization pour allouer le budget temps aux strategies.
+   - LLM uniquement pour proposer parametres/strategies; decision finale par score.
+
+Stack conseille
+- OR-Tools (open-source) pour demarrer et valider le modele.
+- Gurobi pour performance (souvent le meilleur gain net).
+- CPLEX en backup/benchmark.
+
+Architecture d'agents (decisionnaires automatiques)
+- Orchestrator: planifie, lance et supervise les jobs; applique timeouts.
+- Evaluator: calcule le score officiel, detecte violations, met a jour le best.
+- Search Agent: propose nouveaux parametres/strategies (LLM ou heuristiques).
+- Solver Manager: selectionne le backend (OR-Tools / Gurobi / CPLEX) selon disponibilite.
+- Refiner Agent: choisit les fenetres LNS, le taux de fixation, et la priorite des zones a retoucher.
+
+Orchestration non interactive (script sh unique)
+- Entree: dataset, budget temps total, budget par phase, seeds, options solveurs.
+- Sorties: solution finale JSON + logs + resume metrics.
+- Le script doit:
+  - Detecter automatiquement les solveurs disponibles.
+  - Lancer les jobs en parallele avec logs separes.
+  - Aggregation des resultats et selection du best.
+  - Demarrer automatiquement les phases de polissage.
+
+Recommandations d'implementation (phases)
+Phase 0 - Scoring
+- Implementer un evaluateur unique qui appelle score_function.py sans le modifier.
+
+Phase 1 - Runner
+- Script run_pipeline.sh: charge dataset, lance portfolio, score, selectionne best.
+
+Phase 2 - Polisseur LNS
+- OR-Tools CP-SAT pour LNS (fenetres glissantes + warm-start).
+- Enregistrer chaque improvement et stopper si plateau.
+
+Phase 3 - Auto-tuning
+- Bandit/BO pour selection de params, seeds, ou choix de solveur.
+
+Phase 4 - Integration Gurobi/CPLEX
+- Ajout du modele MIP equivalent + warm-start + time limit.
+- Compare perf vs OR-Tools sur un budget fixe.
+
+Controle et decisions IA
+- LLM propose, le score valide.
+- Tout changement doit etre justifie par un gain mesurable.
+- Si pas d'amelioration, rollback au best connu.
+
+Artefacts attendus
+- plan_amelioration_ia.txt (ce doc)
+- run_pipeline.sh (script unique, non interactif)
+- logs/ (par run), results/ (par solution)
+- evaluator (score officiel)
+
+Note finale
+- Le coeur du gain proviendra du couple "portfolio heuristique" + "polissage LNS".
+- Le MIP global ne doit etre active que si les sites candidats sont bien reduits.
+- L'IA est utile comme moteur de proposition, pas comme arbitre.

@@ -1,33 +1,20 @@
 {
   "results": {
-    "3_suburbia": {
-      "optimized_solution": 31305000,
-      "solve": 35930000
-    },
-    "4_epitech": {
-      "optimized_solution": 36095000,
-      "solve": 42700000
+    "6_manhattan": {
+      "optimized_solution": 30258000,
+      "solve": 31225000
     }
   },
   "characteristics": {
-    "3_suburbia": {
-      "num_buildings": 2601,
-      "avg_demand": 1233.0,
-      "max_demand": 5000,
-      "min_demand": 52,
-      "spatial_spread": 9451034.986543637,
-      "clustering": "low",
-      "distribution": "moderate"
-    },
-    "4_epitech": {
-      "num_buildings": 5000,
-      "avg_demand": 1006.316,
-      "max_demand": 4782,
-      "min_demand": 38,
-      "spatial_spread": 67141341.01723196,
+    "6_manhattan": {
+      "num_buildings": 10000,
+      "avg_demand": 435.8746,
+      "max_demand": 3103,
+      "min_demand": 77,
+      "spatial_spread": 9554379.26855438,
       "clustering": "low",
       "distribution": "dense"
     }
   },
-  "timestamp": 1767043062.006701
+  "timestamp": 1767090172.6798859
 }

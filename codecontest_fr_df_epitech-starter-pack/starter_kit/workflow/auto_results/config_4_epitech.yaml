@@ -2,11 +2,11 @@ active_datasets:
 - 4_epitech
 ai_model: claude-sonnet-4-5-20250929
 analysis_window: 5
-auto_apply_suggestions: false
+auto_apply_suggestions: true
 enable_ai_reflection: true
 generate_reports: true
-max_iterations: 50
-max_reflection_cycles: 3
+max_iterations: 500
+max_reflection_cycles: 10
 max_runtime_per_dataset: 0
 max_runtime_seconds: 0
 min_improvement_threshold: 0.5

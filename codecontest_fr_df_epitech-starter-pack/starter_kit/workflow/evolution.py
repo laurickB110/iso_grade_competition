@@ -65,7 +65,9 @@ class EvolutionWorkflow:
         for dataset_name in datasets:
             max_gen = 0
             # Look for ai_{dataset}_gen*.py files
-            pattern = f"ai_{dataset_name.split('_', 1)[1]}_gen*.py"
+            # Must match the naming in ai_solver_generator.py line 132
+            safe_name = dataset_name.replace("_", "").replace("-", "")
+            pattern = f"ai_{safe_name}_gen*.py"
             for filepath in self.engine.generated_dir.glob(pattern):
                 # Extract generation number
                 filename = filepath.stem
@@ -93,8 +95,9 @@ class EvolutionWorkflow:
                 self.benchmark_results[dataset_name] = {}
 
             # Find all generated solvers for this dataset
-            dataset_short = dataset_name.split('_', 1)[1]
-            pattern = f"ai_{dataset_short}_gen*.py"
+            # Must match the naming in ai_solver_generator.py line 132
+            safe_name = dataset_name.replace("_", "").replace("-", "")
+            pattern = f"ai_{safe_name}_gen*.py"
 
             for filepath in self.engine.generated_dir.glob(pattern):
                 filename = filepath.stem

@@ -23,7 +23,7 @@ Strategy for small, sparse, high-clustering datasets:
 """
 import random
 from typing import Dict, List, Set, Tuple, Optional
-from .base import (
+from ..base import (
     SolverResult,
     ANTENNA_TYPES,
     ANTENNA_TYPES_BY_CAPACITY,

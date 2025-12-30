@@ -332,6 +332,17 @@ def solve(dataset: dict, *, seed: int, params: dict = None) -> dict:
     pass
 ```
 
+IMPORTANT: ANTENNA_TYPES structure (from base.py):
+```python
+ANTENNA_TYPES = {{
+    'Nano': {{'range': 50, 'capacity': 200, 'cost_on_building': 5_000, 'cost_off_building': 6_000}},
+    'Spot': {{'range': 100, 'capacity': 800, 'cost_on_building': 15_000, 'cost_off_building': 20_000}},
+    'Density': {{'range': 150, 'capacity': 5_000, 'cost_on_building': 30_000, 'cost_off_building': 50_000}},
+    'MaxRange': {{'range': 400, 'capacity': 3_500, 'cost_on_building': 40_000, 'cost_off_building': 50_000}}
+}}
+```
+Note: Keys are 'cost_on_building' and 'cost_off_building', NOT 'cost'!
+
 # Existing Solvers (for reference)
 
 {chr(10).join(examples[:2000])}  # Truncated for brevity
@@ -340,12 +351,14 @@ def solve(dataset: dict, *, seed: int, params: dict = None) -> dict:
 
 Generate a COMPLETE, WORKING Python solver that:
 
-1. **Imports from base.py**: Use ANTENNA_TYPES, get_building_demand, distance, etc.
+1. **Imports from base.py**: Use `from ..base import ANTENNA_TYPES, get_building_demand, distance, etc.` (note the `..` for parent directory)
 2. **Follows the interface**: Function signature must match exactly
 3. **Is specialized for {dataset_name}**: Use insights from the analysis
 4. **Implements a novel approach**: Don't just copy existing solvers
 5. **Handles edge cases**: All buildings covered, valid ranges, capacities
 6. **Uses the seed**: For reproducible randomness (random.Random(seed))
+
+CRITICAL: Your code will be saved in methods/generated/ directory, so imports from base.py MUST use `from ..base import` (parent directory).
 
 Generate ONLY the Python code, no explanations. Make it production-ready.
 
